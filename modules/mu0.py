@@ -1,0 +1,127 @@
+"""
+Implement the educational math unit of the primary level:
+"The Greatest Common Divisor and the Least Common Multiple Computation".
+"""
+
+
+import tkinter as tk
+from itertools import zip_longest as itertools__zip_longest
+
+from values import MAP_RANKS
+from modules.commons import factory_funcs
+from modules.common_ui import make_ui
+from modules.calcs_math import div_detailed, gcd_or_lcm
+
+
+def calcs(
+        numbers: list[str],
+        display: tk.Text,
+) -> list[str]:
+    """
+    Perform calculations on a sequence of input natural numbers, including prime factorization (with step-by-step
+    division), GCD, and LCM. Display formatted results, written them to the file, and return the validated input
+    (match: digit format, repeats, equal to 1).
+    """
+    nums = [n for n in dict.fromkeys((int(n) for n in numbers if n.isdigit())) if n > 1]  # delete repeats, equal to 1
+    if not nums:
+        return []
+    current_suite = tuple(sorted(nums))
+    numbers = list(map(str, nums))
+    if current_suite == calcs._ui__last_numbers:
+        return numbers
+    calcs._ui__last_numbers = current_suite
+
+    factors: dict[str, dict[str, list[tuple[int, int]] | dict[int, int]]] = {}
+    for n in nums:
+        res = div_detailed(n)
+        factors[str(n)] = {"div_pairs": res[0], "ranks": res[1]}
+
+    commons: list[tuple[str, dict[int, int], int]] = []
+    if len(nums) > 1:
+        all_factors = [v["ranks"] for v in factors.values()]
+        for k in ("GCD", "LCM"):
+            commons.append((k, *gcd_or_lcm(all_factors, k)))
+
+    data_print = _structuring([v["div_pairs"] for v in factors.values()],
+                              [(k, v["ranks"]) for k, v in factors.items()],
+                              commons)
+    _output(data_print, display)
+
+    return numbers
+
+
+def _structuring(
+        columnar: list[list[tuple[int, int]]],
+        linear1: list[tuple[str, dict[int, int]]],
+        linear2: list[tuple[str, dict[int, int], int]]
+) -> list[str]:
+    """
+    Format a content for containers accepting.
+    """
+    corr_l, corr_r = [], []
+    for pairs in columnar:
+        max_l = max_r = 0
+        for l, r in pairs:
+            max_l = max(max_l, len(str(l)))
+            max_r = max(max_r, len(str(r)))
+        corr_l.append(max_l)
+        corr_r.append(max_r)
+    sep = " | "
+    len_sep = len(sep)
+    section = []
+    for row in itertools__zip_longest(*columnar, fillvalue=(0, 0)):
+        lines = []
+        for idx, (l, r) in enumerate(row):
+            if l:
+                lines.append(f"{l:>{corr_l[idx]}}{sep}{r:<{corr_r[idx]}}")
+            else:
+                lines.append(" " * (corr_l[idx] + len_sep + corr_r[idx]))
+        section.append("   ".join(lines).rstrip())
+    data = ["\n".join(section) + "\n\n", ]
+
+    corr_l = max(len(itm[0]) for itm in linear1)
+    section = []
+    for row in linear1:
+        section.append(f"{row[0]:>{corr_l}} = {_expression(row[1])}")
+    data.append("\n".join(section) + "\n\n")
+
+    if linear2:
+        section = []
+        sep = " = "
+        for row in linear2:
+            section.append(f"{row[0]}{sep + _expression(row[1]) if row[1] else ""}{sep}{row[2]:_}")
+        data.append("\n".join(section))
+
+    return data
+
+
+def _expression(terms: dict[int, int]) -> str:
+    """
+    Create a math expression and convert the exponent of each term to uppercase.
+    """
+    line = []
+    for k in sorted(terms.keys()):
+        line.append(f"{k:_}{"".join(MAP_RANKS[d] for d in str(terms[k]))}")
+    return " · ".join(line)
+
+
+def _output(
+        data: list[str],
+        tbox: tk.Text
+) -> None:
+    """
+    Display a ready-made content and write it to the file.
+    """
+    tbox.config(state="normal")
+    tbox.delete("1.0", "end")
+    for txt in data:
+        tbox.insert("end", txt)
+    tbox.config(state="disabled")
+    try:
+        with open(calcs._ui__extra["Path_result"], "w", encoding="utf-8") as f_wt:
+            f_wt.writelines(data)
+    except OSError:
+        pass
+
+
+ui = factory_funcs(make_ui, calcs, 1)

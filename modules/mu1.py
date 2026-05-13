@@ -1,0 +1,348 @@
+"""
+Implement the educational math unit of the primary level:
+"Common Fractions".
+
+Notes:
+    • Use a data-driven rendering model with a fixed logical content size.
+    • The window may be resized freely up to the meaningful content bounds, but not beyond.
+    • Window upsize limits are derived from content geometry and UI overhead, not vice versa.
+    • Content is never scaled or distorted; scrolling is used when the viewport is smaller.
+"""
+
+
+import tkinter as tk
+from math import gcd as math__gcd, lcm as math__lcm
+
+from values import DMAP
+from modules.commons import factory_funcs
+from modules.common_ui import make_ui
+
+
+def calcs(
+        numbers: list[str],
+        display: tk.Canvas,
+) -> list[str]:
+    """
+    Perform calculations on a sequence of input natural numbers, interpreted as consecutive pairs (numerator,
+    denominator) corresponding to two common fractions. Include the most common operations of fractions and optionally
+    detail intermediate transformations (simplifying by GCD, conversion to a common denominator using LCM, conversion
+    to a mixed number). Display formatted results and return the validated input (match: digit format).
+    """
+    def _adt_sub_filling(seed_is: list[list[str | int]]) -> None:
+        data_draw[k] = seed_is + [_meta_seq([f"{nr1} {DMAP[k]} {nr2}", str(dr)], "clr2"),
+                                  _meta_seq(_to_str((nr, dr)), "clr4")]
+        if nr:  # the numerator possibly is 0 only when the subtraction
+            _mixed_if(add_data_draw, k, *_simplify_if(data_draw[k], (nr, dr), "clr4"))
+        else:
+            add_data_draw[k] = _meta_seq(_to_str((0, 0, 1)), "clr3")
+        qts_half_cells.append(_qty_segments(data_draw[k], add_data_draw.get(k)))
+        operations.append((k, DMAP[k]))
+
+    def _mul_div_filling() -> None:
+        sign = DMAP["mul"]
+        data_draw[k] = seed + [_meta_seq([f"{nr1} {sign} {nr2}", f"{dr1} {sign} {dr2}"], "clr2"), ]
+        gcd1, gcd2 = math__gcd(nr1, dr2), math__gcd(nr2, dr1)  # for the cross-lying reduction
+        if gcd1 > 1 or gcd2 > 1:
+            nr1_, dr2_ = top_l, bott_r = nr1, dr2
+            nr2_, dr1_ = top_r, bott_l = nr2, dr1
+            if gcd1 > 1:
+                nr1_, dr2_ = nr1 // gcd1, dr2 // gcd1
+                top_l, bott_r = f"{nr1_}{sign}{gcd1}", f"{dr2_}{sign}{gcd1}"
+            if gcd2 > 1:
+                nr2_, dr1_ = nr2 // gcd2, dr1 // gcd2
+                top_r, bott_l = f"{nr2_}{sign}{gcd2}", f"{dr1_}{sign}{gcd2}"
+            data_draw[k].append(_meta_seq([f"{top_l} {sign} {top_r}", f"{bott_l} {sign} {bott_r}"], "clr1"))
+            nr_, dr_ = nr1_ * nr2_, dr1_ * dr2_
+        else:
+            nr_, dr_ = nr1 * nr2, dr1 * dr2
+        data_draw[k].append(_meta_seq(_to_str((nr_, dr_)), "clr4"))
+        _mixed_if(add_data_draw, k, nr_, dr_)
+        qts_half_cells.append(_qty_segments(data_draw[k], add_data_draw.get(k)))
+        operations.append((k, DMAP[k]))
+
+    nums = [int(n) for n in numbers if n.isdigit()]
+    numbers = list(map(str, nums))
+    if len(nums) < calcs._ui__extra["Min_numbers"]:
+        return numbers
+    current_suite = tuple(nums)
+    if current_suite == calcs._ui__last_numbers:
+        return numbers
+    calcs._ui__last_numbers = current_suite
+
+    fracts = {"ftn": [(nums[0], nums[1]), (nums[2], nums[3])], "cmn": []}
+
+    # two factorization blocks
+    k = "stages{i}"
+    data_draw = {k.format(i=idx): [] for idx in range(2)}
+    add_data_draw = {}
+    for idx, ftn in enumerate(fracts["ftn"]):
+        k_ = k.format(i=idx)
+        data_draw[k_].append(_meta_seq(_to_str(ftn), "clr0"))
+        fracts["ftn"][idx] = _simplify_if(data_draw[k_], ftn, "clr0")
+        nr, dr = fracts["ftn"][idx]
+        _mixed_if(add_data_draw, k_, nr, dr)
+    # common denominator
+    lcm_drs = math__lcm(*(dr for _, dr in fracts["ftn"]))
+    fracts["cmn"].append(lcm_drs)
+    for idx, ftn in enumerate(fracts["ftn"]):
+        nr = ftn[0]
+        factor = lcm_drs // ftn[1]
+        if factor > 1:  # apply normalization only if it changes the fraction
+            nr *= factor
+            if lcm_drs != nums[2 * idx + 1]:  # check to avoid duplicating the original (pre-simplified) fraction
+                for ftn_, clr in zip(([f"{prt}{DMAP["mul"]}{factor}" for prt in ftn],
+                                      _to_str((nr, lcm_drs))), ("clr2", "clr0")):
+                    data_draw[k.format(i=idx)].append(_meta_seq(ftn_, clr))
+        fracts["cmn"].append(nr)
+    qts_half_cells = [_qty_segments(data_draw[k.format(i=0)], add_data_draw.get(k.format(i=0))), ]
+    qts_half_cells[0] += _qty_segments(data_draw[k.format(i=1)], add_data_draw.get(k.format(i=1)), 0)
+    # comparison
+    nr1, nr2 = fracts["cmn"][1:]
+    operations = [(k, DMAP["larger" if nr1 > nr2 else ("equal", "less")[nr1 < nr2]]), ]
+
+    seed = [data_draw[k.format(i=idx)][0] for idx in range(2)]
+    # addition and subtraction
+    k = "adt"
+    nr, dr = nr1 + nr2, fracts["cmn"][0]
+    _adt_sub_filling(seed)
+    k = "sub"
+    seed_sub = seed.copy()
+    if operations[0][1] == DMAP["less"]:
+        seed_sub.reverse()
+        nr1, nr2 = nr2, nr1
+    nr = nr1 - nr2
+    _adt_sub_filling(seed_sub)
+    # multiplication and division
+    k = "mul"
+    nr1, dr1, nr2, dr2 = fracts["ftn"][0] + fracts["ftn"][1]
+    _mul_div_filling()
+    k = "div"
+    nr2, dr2 = dr2, nr2
+    _mul_div_filling()
+
+    qts_half_cells.append(calcs._ui__extra["Min_cells"])
+    entire_cell, half_cell = calcs._ui__extra["Widths_cell"]
+    width = half_cell * max(qts_half_cells) + entire_cell * 3
+    height = entire_cell * (3 * (len(data_draw.keys()) - 1) + 1)
+    ui._calcs__can = display
+    _draw_bg(width, height, entire_cell)
+    _output(data_draw, add_data_draw, operations)
+    _tuneup_sizes(width, height)
+
+    return numbers
+
+
+def _to_str(seq: tuple[int, ...]) -> list[str]:
+    return list(map(str, seq))
+
+
+def _meta_seq(
+        seq: list[str],
+        col: str
+) -> list[str | int]:
+    """
+    Produce a render sequence containing strings, a color, and string lengths rounded up to the nearest even value.
+    """
+    return [*seq, col, *(l + l % 2 for l in map(len, seq))]  # [["w", ]"n", "d", "color", [rLen_w, ]rLen_n, rLen_d]
+
+
+def _simplify_if(
+        array_in: list[list[str | int]],
+        nd: tuple[int, int],
+        clr_end: str
+) -> tuple[int, int]:
+    """
+    Reduce a common fraction by GCD(numerator, denominator) if possible, and return a simplified or original; update
+    the data array in place.
+    """
+    gcd_ftn = math__gcd(*nd)
+    if gcd_ftn > 1:
+        nd = tuple(prt // gcd_ftn for prt in nd)
+        for ftn, clr in zip(([f"{prt}{DMAP["mul"]}{gcd_ftn}" for prt in nd], _to_str(nd)), ("clr1", clr_end)):
+            array_in.append(_meta_seq(ftn, clr))
+    return nd
+
+
+def _mixed_if(
+        add_array: dict[str, list[str | int]],
+        key: str,
+        n: int,
+        d: int
+) -> None:
+    """
+    Convert to mixed form of common fraction if possible; update the additional data array in place.
+    """
+    if n >= d:
+        whole, n = divmod(n, d)
+        add_array[key] = _meta_seq(_to_str((whole, n, d)), "clr3")
+
+
+def _qty_segments(
+        array_in: list[list[str | int]],
+        add_seq: list[str | int] | None,
+        snd_cell: int =2  # the second cell of an operation sign
+) -> int:
+    """
+    Compute the horizontal block width (in half cells) from the given data as the maximum of competing upper and
+    lower rows, also implied by the place of separators and additional data (the factor 2 will provide whole cell).
+    """
+    quant = 0
+    for sqn in array_in:
+        quant += max(sqn[-2], sqn[-1])
+    quant += len(array_in) * 2 + snd_cell  # block separators accounting
+    if add_seq:
+        quant += add_seq[-3] + 2  # +2: additional data separator accounting
+        if int(add_seq[1]):
+            quant += max(add_seq[-2], add_seq[-1])
+    return quant
+
+
+def _draw_bg(
+        mark_w: int,
+        mark_h: int,
+        step: int
+) -> None:
+    """
+    Clear the canvas and render a new copybook grid based on the current output layout data.
+    """
+    can = ui._calcs__can
+    can.delete("all")
+    for dlt in range(step, mark_h, step):
+        can.create_line(0, dlt, mark_w, dlt, fill='lightgrey')
+    red_line = mark_w - 2 * step
+    for dlt in range(step, red_line, step):
+        can.create_line(dlt, 0, dlt, mark_h, fill='lightgrey')
+    can.create_line(red_line, 0, red_line, mark_h, fill='red', width=1)
+
+
+def _output(
+        data: dict[str, list[list[str | int]]],
+        add_data: dict[str, list[str | int]],
+        names: list[tuple[str, str]]
+) -> None:
+    """
+    Display a content, considering that the expression symbol takes up half a cell and the separator a cell.
+    """
+    mirror_y = lambda: (runner_y - step_hlf, runner_y + step_hlf)
+    step, step_hlf = calcs._ui__extra["Widths_cell"]
+
+    runner_x = step
+    runner_y = 2 * step
+    position_ys = mirror_y()
+    for idx in range(2):
+        k = names[0][0].format(i=idx)
+        add_seq = add_data.get(k)
+        if add_seq:
+            runner_x = _rend_mix(add_seq, runner_x, runner_y, position_ys) + step
+            _draw_text(runner_x - step_hlf, runner_y, DMAP[add_seq[3]])
+        runner_x = _rend_hblock(data[k], runner_x, runner_y, position_ys)
+        if idx == 0:
+            _draw_text(runner_x + step, runner_y, DMAP["clr4"], names[0][1], DMAP["font_ops"])
+            runner_x += 2 * step
+
+    for k, sgn in names[1:]:
+        runner_x = step
+        runner_y += 3 * step
+        position_ys = mirror_y()
+        runner_x = _rend_hblock([data[k][0], ], runner_x, runner_y, position_ys)
+        _draw_text(runner_x + step, runner_y, DMAP["clr4"], sgn, DMAP["font_ops"])
+        runner_x += 2 * step
+        runner_x = _rend_hblock(data[k][1:], runner_x, runner_y, position_ys)
+        add_seq = add_data.get(k)
+        if add_seq:
+            _draw_text(runner_x + step_hlf, runner_y, DMAP[add_seq[3]])
+            _rend_mix(add_seq, runner_x + step, runner_y, position_ys)
+
+
+def _rend_mix(
+        seq: list[str | int],
+        rnr_x: int,
+        rnr_y: int,
+        pos_ys: tuple[int, int]
+) -> int:
+    """
+    Render the data mixed form and return the current X position.
+    """
+    stp, stp_hlf = calcs._ui__extra["Widths_cell"]
+    width = stp_hlf * seq[4]
+    color = DMAP[seq[3]]
+    _draw_text(_pos_x(rnr_x, width), rnr_y, color, seq[0])
+    rnr_x += width
+    if int(seq[1]):
+        width = stp_hlf * max(seq[5:])
+        for txt, y in zip(seq[1:3], pos_ys):
+            _draw_text(_pos_x(rnr_x, width), y, color, txt)
+        _draw_bar((rnr_x, rnr_x + width), rnr_y, color)
+        rnr_x += width
+    return rnr_x
+
+
+def _pos_x(
+        curr: int,
+        add: int
+) -> int:
+    return curr + add // 2
+
+
+def _draw_text(
+        x: int,
+        y: int,
+        clr: str,
+        t: str =DMAP["equal"],
+        fnt: tuple[str | int, ...] =DMAP["font"]
+) -> None:
+    ui._calcs__can.create_text(x, y, text=t, fill=clr, font=fnt)
+
+
+def _draw_bar(
+        x: tuple[int, int],
+        y: int,
+        clr: str
+) -> None:
+    ui._calcs__can.create_line(x[0], y, x[1], y, width=2, fill=clr)
+
+
+def _rend_hblock(
+        array_in: list[list[str | int]],
+        rnr_x: int,
+        rnr_y: int,
+        pos_ys: tuple[int, int]
+) -> int:
+    """
+    Render a horizontal data (sub-) block, including its separators, and return the current X position.
+    """
+    stp, stp_hlf = calcs._ui__extra["Widths_cell"]
+    for i, sqn in enumerate(array_in):
+        color = DMAP[sqn[2]]
+        if i > 0:
+            _draw_text(rnr_x + stp_hlf, rnr_y, color)
+            rnr_x += stp
+        width = stp_hlf * max(sqn[3:])
+        for txt, y in zip(sqn[:2], pos_ys):
+            _draw_text(_pos_x(rnr_x, width), y, color, txt)
+        _draw_bar((rnr_x, rnr_x + width), rnr_y, color)
+        rnr_x += width
+    return rnr_x
+
+
+def _tuneup_sizes(
+        cont_w: int,
+        cont_h: int
+) -> None:
+    """
+    Post-render window size tuning ensures that the window can be expanded up to the useful content bounds.
+    """
+    win = ui._ui__win
+    can = ui._calcs__can
+    can.config(scrollregion=can.bbox("all"))
+    win.update_idletasks()
+    w = cont_w + (win.winfo_width() - can.winfo_width()) + 10
+    h = cont_h + (win.winfo_height() - can.winfo_height()) + 10
+    #w, h = min(w, int(win.winfo_vrootwidth()*0.91)), min(h, int(win.winfo_vrootheight()*0.81))
+    win.maxsize(w, h)
+    if win.state() == "zoomed":
+        win.withdraw()
+        win.state('zoomed')
+
+
+ui = factory_funcs(make_ui, calcs, 1)

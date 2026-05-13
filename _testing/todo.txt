@@ -1,0 +1,12 @@
+root/
+├── _testing/
+│   ├── unit/
+│   │   ├── test_calcs_math.py   [>]
+│   │   ├── test_mu0.py          [ ]
+│   │   └── test_mu1.py          [ ]
+│   └── manual/
+│       └── ui_use_cases.md      [ ]
+...
+
+Testing of algorithm             [ ]
+toolbag.py clean_cash() utility  [ ]
