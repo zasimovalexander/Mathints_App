@@ -1,34 +1,43 @@
 """
-Launch the application: create the root window with a list of available math units, handle navigation in
-the selection menu, and open the selected math unit module.
+Application entry point.
 
-High-Level Control Structure (optional runtime side-effects: (1), (2))
+Requirements:
+    Python 3.12+
 
+High-Level Control Structure (optional runtime side-effects: (1), (2)):
     conductor.py ───┬──────────────────────┬─► docs/spec_mu*.pkl
      ║     └─(1)    │                      │
      ║           ┌─►├─► common_ui.py ───┬─►└─► values.py ◄──┐
      ║           │  │          └─(1)    │                   │
      ╠═► mu0.py ─┼─►└───► commons.py ◄──┴─► calcs_math.py ◄─┤
      ║    └─(2)  │                                          │   (1) artfs/cust_set.pkl
-     ╚═► mu1.py ─┴──────────────────────────────────────────┘   (2)      /Factoring.txt
-
-Workflow:
-    • User selects a math unit in the root window.
-    • The selected module is called with:
-        - parent root window
-        - settings and texts dictionaries
-        - identifiers of a math unit and a UI language.
+     ╚═► mu1.py ─┴──────────────────────────────────────────┘   (2)       Factoring.txt
 
 Responsibilities:
+    • Create the root window.
     • Build the selection UI (labels, radio buttons, control buttons, language menu).
     • Bind navigation and control (as add options) keys.
     • Route control to the chosen math unit.
     • Handle safe application exit.
 
+Workflow:
+    • User selects a math unit in the root window.
+    • Language change is then disabled for the current session.
+    • The root window is hidden (restored upon return).
+    • The selected module is called with:
+        - parent root window
+        - settings and texts dictionaries
+        - identifiers of a math unit and a UI language.
+
+Scalability:
+    Core processing logic (loops, sampling, generation, constants) relating to:
+        - thematic module quantity
+        - UI language localizations
+        - additional features (e.g., randomizer types)
+    is designed for easy future expansion or reduction with minimal code changes.
+
 Notes:
-    • Only one math unit window is active at a time.
-    • Root window is withdrawn when a module opens and restored afterwards; language change is then disabled for
-      the current session.
+    • Only one interactive window (selection or math unit UI) is active at a time.
     • Non-critical module data (description) may be absent; defaults are used.
     • Behavior-driven settings: persistence follows user actions.
 """
@@ -88,7 +97,7 @@ def ui_pick() -> None:
             win_pick,
             cursor="hand2",
             variable=clue_mu,
-            value=idx
+            value=idx  # assign current idx immediately
         ).grid(row=idx, column=1, sticky="w")
 
     # The control section
@@ -165,7 +174,7 @@ def _open_munit(
         • On the first run, the function disables the language switching option.
         • Hide the root window.
         • Load module settings from the root-level file.
-        • Restore its specification from a store (pickle), or use default stub if not available (non-critical data).
+        • Restore its specification from a store (pickle), or use default stub if not available.
         • Dynamically import a module by a path.
         • Call its UI entry point with parent window, settings, and specification.
     """

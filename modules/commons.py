@@ -7,7 +7,7 @@ from pickle import load as pickle__load, dump as pickle__dump, UnpicklingError a
 from typing import Callable
 
 
-def load_pkl(path: str) -> dict[str, str | int]:
+def load_pkl(path: str) -> dict[str, int]:
     """
     Read the parameters.
     """
@@ -41,12 +41,31 @@ def factory_funcs(
         i_extra: int =None
 ) -> Callable:
     """
-    Build a function-controller for the math unit UI.
+    Build a function-controller for a math unit. It acts as a window lifecycle manager and runtime state holder.
     """
     def _ui(*args) -> None:
         """
-        Call the common window constructor or return existing one. Create and update the objects attributes for
-        inter module interaction.
+        Create a reusable UI entry-point controller.
+
+        Responsibilities:
+            • Call the UI constructor or reuse an existing window.
+            • Preserve module-local UI state between calls.
+            • Bind calculation handlers to UI objects.
+            • Attach shared runtime attributes for intermodule interaction.
+            • Forward runtime arguments and optionally interception desired values.
+
+        Low-level Control Structure (topology of the import/runtime stages):
+            conductor.py
+             ├─ Import Stage
+             │   └─ mu*.py dynamic loading
+             │       ├─ import commons.factory_funcs
+             │       ├─ import common_ui.make_ui
+             │       └─ ui = factory_funcs(make_ui, calcs[, extra])
+             │                ├─ closure creation
+             │                └─ _ui(*args) controller binding
+             └─ Runtime Stage
+                 └─ mu*.ui(...) execution
+                     └─ _ui(*args)
         """
         if hasattr(_ui, "_ui__win"):
             _ui._ui__win.deiconify()

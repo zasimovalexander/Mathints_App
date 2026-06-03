@@ -12,10 +12,10 @@ Responsibilities:
       are properly stopped.
 
 Notes:
-    • Returning hides the current window while preserving all parameters and input state; the input-related info window
-      is closed to avoid confusion in other modules.
+    • Returning to the selection UI hides the current window while preserving all last actions and states;
+      the input-related info window is closed to avoid confusion in other modules.
     • The native window widget [x] repeats the return behavior.
-    • Behavior-driven settings by last sessions.
+    • Behavior-driven settings by the last session.
 """
 
 
@@ -104,7 +104,7 @@ def make_ui(
     cfg["label_ranks"].grid(row=0, sticky="w", padx=5)
     cfg["entry"].grid(row=1, sticky="w", padx=5, pady=5)
     cfg["butt_clean"].grid(row=1, column=1, sticky="nw", pady=5)
-    frame_display.grid(row=2, columnspan=2, sticky="nsew", padx=5)  # +1 "virtual" column for independent widening
+    frame_display.grid(row=2, columnspan=2, sticky="nsew", padx=5)  # occupy all grid columns for independent widening
     win.columnconfigure(1, weight=1)
     win.rowconfigure(2, weight=1)
     for btn, sd in zip(buttons, ("w", "", "e")):
@@ -210,10 +210,9 @@ def _relay_lock(
         • If frozen == True: Disable.
         • If frozen == False: Enable, but some widgets are unavailable if additional conditions are not met.
 
-    Notes:
-        During freezing, additional conditions are evaluated against the pre-update context. When unfreezing, the input
-        context is updated first. This prevents status duplication and ensures boundary cases are synchronized with
-        lock cyclicity.
+    Call Cases:
+        • Directly if updating the user input data context is not required.
+        • Through the helper function that updates that context beforehand.
     """
     cfg["entry"].config(state=cfg["states_wgt"][frozen])
     if cfg["last_text"]:
@@ -330,7 +329,7 @@ def _make_menu(
         ilg: int
 ) -> None:
     """
-    Build and return the main menu containing help and input options.
+    Build the main menu containing help and input options.
     """
     menu = tk.Menu(cfg["win"])
     cfg["win"].config(menu=menu)
@@ -498,7 +497,7 @@ def _looping_item(
     """
     Switch a menu item's label and globally store the current state.
     """
-    idx_item = 1
+    idx_item = 1  # index 0 is tearoff item in this menu
     idx_current = tops.index(submenu.entrycget(idx_item, "label"))
     idx_new = (idx_current + 1) % qty_tops
     submenu.entryconfig(idx_item, label=tops[idx_new])
@@ -515,7 +514,8 @@ def _rand_numbers(
     """
     Random search of natural numbers and apply them to the Entry widget.
 
-        • If rank > 0: Single random number of that digit length.
+    Args:
+        • If rank > 0: Single random number of that digit length, if the max amount of numbers has not been reached.
         • If rank == 0: Sequence of random numbers with random digit lengths (input control is not required).
     """
     if rank:
@@ -557,10 +557,11 @@ def _control_input(cfg: dict) -> None:
     """
     Session-based user input control for the Entry widget.
 
+    Responsibilities:
         • Treat each valid keystroke sequence as a single input session.
         • Lock the UI during processing and unlock afterwards.
         • Ignore non-text-modifying events or skip checks when Entry is empty.
-        • Normalize or ignore: repeated delimiters, leading zeros, and other no valid pastes.
+        • Normalize or ignore repeated delimiters, leading zeros, and other invalid pasted content.
         • Extract numbers and truncate them to configured limits.
         • Update the content widgets, also preserve the cursor position and the last number separator.
         • The last user action or system update takes precedence in case of concurrent calls.
@@ -590,7 +591,7 @@ def _truncate_numbers(
         nums: list[str]
 ) -> list[str]:
     """
-    Enforce limits on items number and max digit length.
+    Enforce limits on item numbers (priority to the left data side) and max digit length.
     """
     nums = nums[:cfg["max_nums"]]
     for idx in range(len(nums)):

@@ -9,8 +9,8 @@ Notes:
 
 sm1 = "• "
 sm2 = 406       # px min width
-sm3 = 14        #    cell
-sm4 = sm3 // 2  #    half cell
+sm3 = 14        # px cell
+sm4 = sm3 // 2  # px half cell
 SET_MUS = {
     0: {
         "Name": (f"{sm1}GCD and LCM Computation", f"{sm1}Обчислення НСД і НСК", f"{sm1}Вычисление НОД и НОК"),
@@ -93,8 +93,8 @@ TEXTS_MU = {
         "Rand": {
             "name": ("Generator", "Генератор", "Генератор"),
             "first_iter": ((f"Natural{tm2}", f"Even{tm2}", f"Prime{tm2}"),
-                          (f"Натуральне{tm2}", f"Парне{tm2}", f"Просте{tm2}"),
-                          (f"Натуральное{tm2}", f"Четное{tm2}", f"Простое{tm2}")),
+                           (f"Натуральне{tm2}", f"Парне{tm2}", f"Просте{tm2}"),
+                           (f"Натуральное{tm2}", f"Четное{tm2}", f"Простое{tm2}")),
             "next_suffix": ("-digit", "-значне", "-значное"),
             "last_series": ("{0}digit{1}".format(*tm3), "{0}значні{1}".format(*tm3), "{0}значные{1}".format(*tm3)),
         },
