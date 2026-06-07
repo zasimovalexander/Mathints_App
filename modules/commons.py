@@ -4,6 +4,7 @@ A collection of common patterns for controlling.
 
 
 from pickle import load as pickle__load, dump as pickle__dump, UnpicklingError as pickle__UnpicklingError
+from pathlib import Path as pathlib__Path
 from typing import Callable
 
 
@@ -21,6 +22,16 @@ def load_pkl(path: str) -> dict[str, int]:
     return obj
 
 
+def ensure_dir(path: str) -> None:
+    """
+    Restore the parent directory tree.
+    """
+    try:
+        pathlib__Path(path).parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return
+
+
 def save_pkl(
         obj: dict[str, int],
         path: str
@@ -31,6 +42,20 @@ def save_pkl(
     try:
         with open(path, "wb") as f_wt:
             pickle__dump(obj, f_wt)
+    except OSError:
+        return
+
+
+def save_txt(
+        texts: list[str],
+        path: str
+) -> None:
+    """
+    Write a text.
+    """
+    try:
+        with open(path, "w", encoding="utf-8") as f_wt:
+            f_wt.writelines(texts)
     except OSError:
         return
 

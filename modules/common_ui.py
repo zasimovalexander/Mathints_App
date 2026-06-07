@@ -25,7 +25,7 @@ from typing import Callable
 
 import values as vls
 from modules.calcs_math import gen_rand, primality
-from modules.commons import load_pkl, save_pkl
+from modules.commons import ensure_dir, save_pkl
 
 
 def make_ui(
@@ -34,8 +34,7 @@ def make_ui(
                             | int
                             | tuple[str | int, ...]],
         specific: dict[str, str],
-        i_munit: int,
-        i_lang: int
+        i_munit: int
 ) -> tk.Toplevel:
     """
     Build and return the UI window for a math unit. And loop all widgets on the internal dict for context exchange.
@@ -45,8 +44,6 @@ def make_ui(
                    | tk.Tk | tk.Toplevel | tk.Label | tk.Entry | tk.Text | tk.Canvas | tk.Button
                    | list[str]
                    | dict[str | bool, str | tk.Toplevel]] = {
-        "munit": settings["Name"][i_lang][2:],                                           # : str
-        "pref_ranks": vls.TEXTS_MU["Label"][i_lang],                                     # : str
         "max_rank": settings["Max_rank"],                                                # : int
         "max_nums": settings["Max_numbers"],                                             # : int
         "min_nums": settings["Min_numbers"] - 1,                                         # : int
@@ -57,11 +54,13 @@ def make_ui(
         "win_parent": win_parent,                                                        # : tk.Tk
         "wins_help": {},                                                                 # : dict[str, tk.Toplevel]
         "states_wgt": {True: "disable", False: "normal"},                                # : dict[bool, str]
-        "cust_rand": f"{vls.SET_CUST["RAND"]["name"]}_mu{i_munit}",                      # : str
+        "rand_name": vls.SET_CUST["RAND"]["name"].format(imu=i_munit),                   # : str
     }
-    cfg["patt_final_sep"] = fr"{cfg["patt_nums"]}{cfg["sep_nums"]}+(?:0|\D)*$"           # : str
-    v = load_pkl(vls.SET_CUST["Path"]).get(cfg["cust_rand"])
-    cfg["mode_rand"] = v if v in vls.SET_CUST["RAND"]["valid"] else 0                    # : int
+    cust = win_parent.ui_pick__cust
+    i_lang = cust[vls.SET_CUST["LANG"]["name"]]
+    cfg.update({"munit": settings["Name"][i_lang][2:],                                   # : str
+                "pref_ranks": vls.TEXTS_MU["Label"][i_lang],                             # : str
+                "patt_final_sep": fr"{cfg["patt_nums"]}{cfg["sep_nums"]}+(?:0|\D)*$"})   # : str
 
     # Make widgets
     win = tk.Toplevel(win_parent)
@@ -87,10 +86,9 @@ def make_ui(
 
     buttons = [make_button(cfg,
                            vls.TEXTS_MU["Button"][k][i_lang],
-                           lambda f=fnc, a=add: f(cfg, *a)  # potential expansion point
-                           ) for k, fnc, add in zip(("back", "equal", "exit"),
-                                                    (_revert, _to_calcs, confirm_end),
-                                                    ((), (), (i_lang, )))]
+                           lambda f=fnc: f(cfg)
+                           ) for k, fnc in zip(("back", "equal", "exit"),
+                                               (_revert, _to_calcs, confirm_end))]
     cfg["butt_equal"] = buttons[1]                                                       # : tk.Button
     cfg["butt_equal"].config(state="disabled")
 
@@ -100,7 +98,9 @@ def make_ui(
     cfg["butt_clean"].config(state="disabled")
 
     # Place widgets
-    _make_menu(cfg, specific, i_lang)
+    if cust.get(cfg["rand_name"]) not in vls.SET_CUST["RAND"]["valid"]:
+        cust[cfg["rand_name"]] = 0
+    _make_menu(cfg, specific, i_lang, cust[cfg["rand_name"]])
     cfg["label_ranks"].grid(row=0, sticky="w", padx=5)
     cfg["entry"].grid(row=1, sticky="w", padx=5, pady=5)
     cfg["butt_clean"].grid(row=1, column=1, sticky="nw", pady=5)
@@ -125,7 +125,7 @@ def make_ui(
     )
     win.bind(
         vls.TEXTS_MU["Event_kb"]["exit"],
-        lambda event: confirm_end(cfg, i_lang)
+        lambda event: confirm_end(cfg)
     )
     win.protocol(
         "WM_DELETE_WINDOW",
@@ -262,20 +262,18 @@ def _clean_entry(cfg: dict) -> None:
         cfg["entry"].delete(0, tk.END)
 
 
-def confirm_end(
-        cfg: dict,
-        ilg: int
-) -> None:
+def confirm_end(cfg: dict) -> None:
     """
     Confirm to exit the application.
     """
     win_confirm = tk.Toplevel(cfg["win"])
-    win_confirm.title(vls.TEXTS_CONFIRM["Title"][ilg])
+    i_lang = cfg["win_parent"].ui_pick__cust[vls.SET_CUST["LANG"]["name"]]
+    win_confirm.title(vls.TEXTS_CONFIRM["Title"][i_lang])
     win_confirm.transient(cfg["win"])
     win_confirm.grab_set()
 
     button = make_button({"win": win_confirm},
-                         vls.TEXTS_CONFIRM["Button"][ilg],
+                         vls.TEXTS_CONFIRM["Button"][i_lang],
                          lambda: _end(cfg))
     button.config(width=0)
     button.pack(pady=5)
@@ -292,8 +290,10 @@ def confirm_end(
 
 def _end(cfg: dict) -> None:
     """
-    Stop any worker threads if present, and close the root window.
+    Save custom settings, stop any worker threads if present, and close the root window.
     """
+    ensure_dir(vls.SET_CUST["Path"])
+    save_pkl(cfg["win_parent"].ui_pick__cust, vls.SET_CUST["Path"])
     if hasattr(cfg["win_parent"], "worker_threads"):
         for trd in list(getattr(cfg["win_parent"], "worker_threads", [])):
             if hasattr(trd, "stop"):
@@ -326,7 +326,8 @@ def make_button(
 def _make_menu(
         cfg: dict,
         spec: dict[str, str],
-        ilg: int
+        i_lang: int,
+        i_rand: int
 ) -> None:
     """
     Build the main menu containing help and input options.
@@ -337,13 +338,13 @@ def _make_menu(
     # The help submenu
     menu_help = tk.Menu(menu, tearoff=False)
     menu.add_cascade(
-        label=vls.TEXTS_MU["Menu"]["Help"]["name"][ilg],
+        label=vls.TEXTS_MU["Menu"]["Help"]["name"][i_lang],
         menu=menu_help
     )
     for itm in vls.TEXTS_MU["Menu"]["Help"]["blocks"]:
         menu_help.add_command(
-            label=vls.TEXTS_MU["Menu"]["Help"][itm][ilg],
-            command=lambda k=itm: _show_help(cfg, k, vls.TEXTS_MU["Menu"]["Help"][k][ilg], spec[k])
+            label=vls.TEXTS_MU["Menu"]["Help"][itm][i_lang],
+            command=lambda k=itm: _show_help(cfg, k, vls.TEXTS_MU["Menu"]["Help"][k][i_lang], spec[k])
         )
 
     # The additional input submenu
@@ -353,7 +354,7 @@ def _make_menu(
         menu=menu_0_9
     )
     menu_0_9.add_cascade(
-        label=vls.TEXTS_MU["Menu"]["0_9"]["first_spec"][ilg],
+        label=vls.TEXTS_MU["Menu"]["0_9"]["first_spec"][i_lang],
         state="disabled",
         activebackground="#f0f0f0"
     )
@@ -375,27 +376,27 @@ def _make_menu(
     # The random numbers generation submenu
     menu_rand = tk.Menu(menu)
     menu.add_cascade(
-        label=vls.TEXTS_MU["Menu"]["Rand"]["name"][ilg],
+        label=vls.TEXTS_MU["Menu"]["Rand"]["name"][i_lang],
         menu=menu_rand
     )
-    tops_rand = vls.TEXTS_MU["Menu"]["Rand"]["first_iter"][ilg]
+    tops_rand = vls.TEXTS_MU["Menu"]["Rand"]["first_iter"][i_lang]
     qty = len(tops_rand)
     menu_rand.add_command(
-        label=tops_rand[cfg["mode_rand"]],
+        label=tops_rand[i_rand],
         command=lambda: _calls_in_menu(cfg, _looping_item, tops_rand, menu_rand, qty)
     )
     cfg["entry"].bind(
         vls.TEXTS_MU["Event_kb"]["rand_nums"],
         lambda event: _calls_in_menu(cfg, _looping_item, tops_rand, menu_rand, qty)
     )
-    suf = vls.TEXTS_MU["Menu"]["Rand"]["next_suffix"][ilg]
+    suf = vls.TEXTS_MU["Menu"]["Rand"]["next_suffix"][i_lang]
     for idx in range(1, cfg["max_rank"] + 1):
         menu_rand.add_command(
             label=f"{idx}{suf}",
             command=lambda rank_rand=idx: _calls_in_menu(cfg, _rand_numbers, rank_rand)
         )
     menu_rand.add_command(
-        label=vls.TEXTS_MU["Menu"]["Rand"]["last_series"][ilg],
+        label=vls.TEXTS_MU["Menu"]["Rand"]["last_series"][i_lang],
         command=lambda: _calls_in_menu(cfg, _rand_numbers)
     )
     cfg["entry"].bind(
@@ -498,13 +499,9 @@ def _looping_item(
     Switch a menu item's label and globally store the current state.
     """
     idx_item = 1  # index 0 is tearoff item in this menu
-    idx_current = tops.index(submenu.entrycget(idx_item, "label"))
-    idx_new = (idx_current + 1) % qty_tops
-    submenu.entryconfig(idx_item, label=tops[idx_new])
-    cfg["mode_rand"] = idx_new
-    obj = load_pkl(vls.SET_CUST["Path"])
-    obj[cfg["cust_rand"]] = idx_new
-    save_pkl(obj, vls.SET_CUST["Path"])
+    i_rand = (tops.index(submenu.entrycget(idx_item, "label")) + 1) % qty_tops
+    submenu.entryconfig(idx_item, label=tops[i_rand])
+    cfg["win_parent"].ui_pick__cust[cfg["rand_name"]] = i_rand
 
 
 def _rand_numbers(
@@ -543,10 +540,11 @@ def _make_rand(
     roundup = lambda n: n + 1 if n != 2 and n % 2 == 0 else n
 
     num = gen_rand(r)
-    if cfg["mode_rand"] == 1:
+    i_rand = cfg["win_parent"].ui_pick__cust[cfg["rand_name"]]
+    if i_rand == 1:
         while num % 2:
             num = gen_rand(r)
-    elif cfg["mode_rand"] == 2:
+    elif i_rand == 2:
         num = roundup(num)
         while not primality(num):
             num = roundup(gen_rand(r))

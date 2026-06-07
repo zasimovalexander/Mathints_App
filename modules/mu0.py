@@ -13,7 +13,7 @@ import tkinter as tk
 from itertools import zip_longest as itertools__zip_longest
 
 from values import MAP_RANKS
-from modules.commons import factory_funcs
+from modules.commons import factory_funcs, ensure_dir, save_txt
 from modules.common_ui import make_ui
 from modules.calcs_math import div_detailed, gcd_or_lcm
 
@@ -126,11 +126,8 @@ def _output(
     for txt in data:
         tbox.insert("end", txt)
     tbox.config(state="disabled")
-    try:
-        with open(calcs._ui__extra["Path_result"], "w", encoding="utf-8") as f_wt:
-            f_wt.writelines(data)
-    except OSError:
-        pass
+    ensure_dir(calcs._ui__extra["Path_result"])
+    save_txt(data, calcs._ui__extra["Path_result"])
 
 
 ui = factory_funcs(make_ui, calcs, 1)

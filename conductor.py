@@ -6,12 +6,12 @@ Requirements:
 
 High-Level Control Structure (optional runtime side-effects: (1), (2)):
     conductor.py ───┬──────────────────────┬─► docs/spec_mu*.pkl
-     ║     └─(1)    │                      │
+     ║     └─(0)    │                      │
      ║           ┌─►├─► common_ui.py ───┬─►└─► values.py ◄──┐
      ║           │  │          └─(1)    │                   │
-     ╠═► mu0.py ─┼─►└───► commons.py ◄──┴─► calcs_math.py ◄─┤
+     ╠═► mu0.py ─┼─►└───► commons.py ◄──┴─► calcs_math.py ◄─┤   (0) artfs/
      ║    └─(2)  │                                          │   (1) artfs/cust_set.pkl
-     ╚═► mu1.py ─┴──────────────────────────────────────────┘   (2)       Factoring.txt
+     ╚═► mu1.py ─┴──────────────────────────────────────────┘   (2) artfs/Factoring.txt
 
 Responsibilities:
     • Create the root window.
@@ -27,7 +27,7 @@ Workflow:
     • The selected module is called with:
         - parent root window
         - settings and texts dictionaries
-        - identifiers of a math unit and a UI language.
+        - identifier of a math unit.
 
 Scalability:
     Core processing logic (loops, sampling, generation, constants) relating to:
@@ -38,8 +38,14 @@ Scalability:
 
 Notes:
     • Only one interactive window (selection or math unit UI) is active at a time.
-    • Non-critical module data (description) may be absent; defaults are used.
-    • Behavior-driven settings: persistence follows user actions.
+    • The runtime parameter dict (root window attribute):
+        - serves as the application's runtime source of truth for user settings
+        - stores validated values and allows modules to access current configuration without duplicating state
+        - provides application-wide language localization settings
+        - supports behavior-driven preferences that enhance UX
+        - is persisted on application exit.
+    • Runtime workspace integrity is ensured by recreating missing directories.
+    • Non-critical module data (description, custom settings) may be absent; defaults are used.
 """
 
 
@@ -48,23 +54,28 @@ from importlib import import_module as importlib__import_module
 
 import values as vls
 from modules.common_ui import make_button, confirm_end
-from modules.commons import load_pkl, save_pkl
+from modules.commons import load_pkl
 
 
 def ui_pick() -> None:
     """
-    Create the root window for math unit selection. And loop all widgets on the internal dict for context exchange.
+    Create the root window for math unit selection and the external dict for user settings. Also loop all widgets on
+    the internal dict for context exchange.
     """
+    def sync_munit(*_) -> None: cust[munit_name] = clue_mu.get()
+
     cfg: dict[str, int
                    | tk.Tk | tk.Menu | tk.Label | tk.Button
                    | None] = {
         "qty_units": len(vls.SET_MUS),                                                   # : int
     }
-    v = load_pkl(vls.SET_CUST["Path"]).get(vls.SET_CUST["LANG"]["name"])
-    i_lang = v if v in vls.SET_CUST["LANG"]["valid"] else 0
-    cfg["i_lang"] = i_lang                                                               # : int
 
     win_pick = tk.Tk()
+    cust = win_pick.ui_pick__cust = load_pkl(vls.SET_CUST["Path"])
+    lang_name = vls.SET_CUST["LANG"]["name"]
+    if cust.get(lang_name) not in vls.SET_CUST["LANG"]["valid"]:
+        cust[lang_name] = 0
+    i_lang = cust[lang_name]
     win_pick.title(vls.TEXTS_PICK["Title"][i_lang])
     cfg["win_pick"] = win_pick                                                           # : tk.Tk
 
@@ -84,9 +95,12 @@ def ui_pick() -> None:
     menu_lang.entryconfig(i_lang, state="disabled")
     cfg.update({"menu": menu, "menu_lang": menu_lang})                                   # : tk.Menu
 
-    v = load_pkl(vls.SET_CUST["Path"]).get(vls.SET_CUST["MUNIT"]["name"])
+    munit_name = vls.SET_CUST["MUNIT"]["name"]
+    if cust.get(munit_name) not in vls.SET_CUST["MUNIT"]["valid"]:
+        cust[munit_name] = 0
     clue_mu = tk.IntVar(win_pick,
-                        value=v if v in vls.SET_CUST["MUNIT"]["valid"] else 0)
+                        value=cust[munit_name])
+    clue_mu.trace_add("write", sync_munit)
     for idx in range(cfg["qty_units"]):
         ident = f"label_radbut{idx}"
         cfg[ident] = tk.Label(win_pick,
@@ -103,7 +117,7 @@ def ui_pick() -> None:
     # The control section
     cfg["button"] = make_button({"win": win_pick},
                                 vls.TEXTS_PICK["Button"][i_lang],
-                                lambda: _open_munit(cfg, clue_mu.get()))                 # : tk.Button
+                                lambda: _open_munit(cfg))                                # : tk.Button
     cfg["button"].grid(columnspan=2, pady=5)
     cfg["label"] = tk.Label(win_pick,
                             text=vls.TEXTS_PICK["Label"][i_lang])                        # : tk.Label
@@ -121,16 +135,16 @@ def ui_pick() -> None:
     qty_langs = len(vls.TEXTS_PICK["Menu"]["languages"])
     win_pick.bind(
         vls.TEXTS_PICK["Event_kb"]["lang"],
-        lambda event: _chose_lang(cfg, (cfg["i_lang"] + 1) % qty_langs)
+        lambda event: _chose_lang(cfg, (cust[lang_name] + 1) % qty_langs)
     )
     concord = {"win": win_pick, "win_parent": win_pick}  # to match the call interface
     win_pick.bind(
         vls.TEXTS_PICK["Event_kb"]["exit"],
-        lambda event: confirm_end(concord, cfg["i_lang"])
+        lambda event: confirm_end(concord)
     )
     win_pick.protocol(
         "WM_DELETE_WINDOW",
-        lambda: confirm_end(concord, cfg["i_lang"])
+        lambda: confirm_end(concord)
     )
 
     # The setup section
@@ -141,32 +155,28 @@ def ui_pick() -> None:
 
 def _chose_lang(
         cfg: dict,
-        ilg: int  # new value
+        i_lang: int  # new value
 ) -> None:
     """
     Switch UI language, refresh the root window, and rewrite its default value. A current widget item is blocked.
     """
-    cfg["win_pick"].title(vls.TEXTS_PICK["Title"][ilg])
+    cfg["win_pick"].title(vls.TEXTS_PICK["Title"][i_lang])
+    cust = cfg["win_pick"].ui_pick__cust
+    lang_name = vls.SET_CUST["LANG"]["name"]
     cfg["menu"].entryconfig(
-        vls.TEXTS_PICK["Menu"]["name"][cfg["i_lang"]],
-        label=vls.TEXTS_PICK["Menu"]["name"][ilg]
+        vls.TEXTS_PICK["Menu"]["name"][cust[lang_name]],  # current value
+        label=vls.TEXTS_PICK["Menu"]["name"][i_lang]
     )
     for idx in range(cfg["qty_units"]):
-        cfg[f"label_radbut{idx}"].config(text=vls.SET_MUS[idx]["Name"][ilg])
-    cfg["button"].config(text=vls.TEXTS_PICK["Button"][ilg])
-    cfg["label"].config(text=vls.TEXTS_PICK["Label"][ilg])
-    cfg["menu_lang"].entryconfig(ilg, state="disabled")
-    cfg["menu_lang"].entryconfig(cfg["i_lang"], state="normal")
-    cfg["i_lang"] = ilg
-    obj = load_pkl(vls.SET_CUST["Path"])
-    obj[vls.SET_CUST["LANG"]["name"]] = ilg
-    save_pkl(obj, vls.SET_CUST["Path"])
+        cfg[f"label_radbut{idx}"].config(text=vls.SET_MUS[idx]["Name"][i_lang])
+    cfg["button"].config(text=vls.TEXTS_PICK["Button"][i_lang])
+    cfg["label"].config(text=vls.TEXTS_PICK["Label"][i_lang])
+    cfg["menu_lang"].entryconfig(i_lang, state="disabled")
+    cfg["menu_lang"].entryconfig(cust[lang_name], state="normal")
+    cust[lang_name] = i_lang
 
 
-def _open_munit(
-        cfg: dict,
-        i_munit: int
-) -> None:
+def _open_munit(cfg: dict) -> None:
     """
     Open the selected math unit window and control user's settings.
 
@@ -178,26 +188,23 @@ def _open_munit(
         • Dynamically import a module by a path.
         • Call its UI entry point with parent window, settings, and specification.
     """
+    i_lang = cfg["win_pick"].ui_pick__cust[vls.SET_CUST["LANG"]["name"]]
     if cfg["menu"]:
         cfg["menu"].entryconfig(
-            vls.TEXTS_PICK["Menu"]["name"][cfg["i_lang"]],
+            vls.TEXTS_PICK["Menu"]["name"][i_lang],
             state="disabled"
         )
         cfg["menu"] = None                                                               # : None
         cfg["win_pick"].unbind(vls.TEXTS_PICK["Event_kb"]["lang"])
-    obj = load_pkl(vls.SET_CUST["Path"])
-    v = obj.get(vls.SET_CUST["MUNIT"]["name"])
-    if v not in vls.SET_CUST["MUNIT"]["valid"] or v != i_munit:
-        obj[vls.SET_CUST["MUNIT"]["name"]] = i_munit
-        save_pkl(obj, vls.SET_CUST["Path"])
     cfg["win_pick"].withdraw()
+    i_munit = cfg["win_pick"].ui_pick__cust[vls.SET_CUST["MUNIT"]["name"]]
     set_mu = vls.SET_MUS[i_munit]
-    spec_mu = load_pkl(set_mu["Path_help"].format(lng=cfg["i_lang"]))
+    spec_mu = load_pkl(set_mu["Path_help"].format(lng=i_lang))
     if not spec_mu:
         spec_mu = dict.fromkeys(vls.TEXTS_MU["Menu"]["Help"]["blocks"],
                                 "[data not found]")
     munit = importlib__import_module(set_mu["Path"])
-    munit.ui(cfg["win_pick"], set_mu, spec_mu, i_munit, cfg["i_lang"])
+    munit.ui(cfg["win_pick"], set_mu, spec_mu, i_munit)
 
 
 if __name__ == "__main__":

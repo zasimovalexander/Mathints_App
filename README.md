@@ -15,15 +15,16 @@ for pupils and their parent, providing essential rules and computation algorithm
 
 ### **Structure**
 - `conductor.py` – launching the app and handling unit selection.
-- `mu0.py` – the GCD/LCM math unit.
-- `mu1.py` – the Common Fractions math unit.
+- `mu*.py` – thematic math units.
 - `common_ui.py` – building and managing active unit windows.
 - `values.py` – constants for texts, settings, and key bindings.
+- `calcs_math.py` – finding math values.
+- `commons.py` – common patterns.
 
-Additional modules handle decomposition, optimization, and internal logic support.
-
-### **Development Helper**
-The `_helpDev/` directory contains a small developer-only tool. It is not required at runtime.
+*Directory contents*
+- `docs/` – user help information for each math unit in several languages.
+- `artfs/` – runtime side-effects are intentionally committed for demonstration purposes.
+- `_helpDev/` – small dev-only tools that are not required at runtime.
 
 ### **Running Tests**
 >pip install pytest  

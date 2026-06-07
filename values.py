@@ -1,9 +1,9 @@
 """
 Constant definitions for module settings, windows texts, and keyboard events used throughout the application.
 
-Notes:
-    {lng} is a format specifier for language ID: 0=EN, 1=UA, 2=RU. Other textual values are localized by selecting from
-    tuples.
+Format specifiers:
+    • {lng} for language ID: 0=EN, 1=UA, 2=RU; other textual values are localized by selecting from tuples.
+    • {imu} associate a custom default value of the randomizer with its module.
 """
 
 
@@ -48,7 +48,7 @@ SET_CUST = {
         "valid": (0, 1),
     },
     "RAND": {
-        "name": "default_rand",
+        "name": "default_rand_mu{imu}",
         "valid": (0, 1, 2),
     },
 }
