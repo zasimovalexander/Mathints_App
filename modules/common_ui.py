@@ -242,19 +242,12 @@ def _update_and_unlock(
     cfg["last_text"] = cfg["sep_nums"].join(numbers)
     if ending:
         cfg["last_text"] += cfg["sep_nums"]
-    _redraw_ranks(cfg)
+    suite_ranks = f"{cfg["sep_nums"]} ".join([str(len(n)) for n in numbers])
+    cfg["label_ranks"].config(text=f"{cfg["pref_ranks"]}{suite_ranks}")
     cfg["entry"].after_idle(lambda: (_relay_lock(cfg),
                                      _clean_entry(cfg),
                                      cfg["entry"].insert(0, cfg["last_text"]),
                                      cfg["entry"].icursor(position)))
-
-
-def _redraw_ranks(cfg: dict) -> None:
-    """
-    Update the Label widget of digit lengths.
-    """
-    suite_ranks = f"{cfg["sep_nums"]} ".join([str(len(n)) for n in cfg["numbers"]])
-    cfg["label_ranks"].config(text=f"{cfg["pref_ranks"]}{suite_ranks}")
 
 
 def _clean_entry(cfg: dict) -> None:

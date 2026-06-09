@@ -123,8 +123,10 @@ TEXTS_CONFIRM = {
     "Event_kb": kb_exit,
 }
 
-MAP_RANKS = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "0":"⁰"}
+RANK_MAP = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "0":"⁰"}
 
-DMAP = {"clr0": "blue", "clr1": "black", "clr2": "darkblue", "clr3": "grey", "clr4": "darkred",
-        "font": ('Comic Sans MS', 9, 'bold'), "font_ops": ('Comic Sans MS', 11, 'bold'),
-        "equal": "=", "larger": ">", "less": "<", "adt": "+", "sub": "−", "mul": "•", "div": ":"}
+OPS_MAP = {"sep_dvr": "|", "equal": "=", "larger": ">", "less": "<", "adt": "+", "sub": "−", "mul": "•", "mul_wee": "·",
+           "div": ":"}
+
+DRW_MAP = {"clr0": "blue", "clr1": "black", "clr2": "darkblue", "clr3": "grey", "clr4": "darkred",
+           "font": ('Comic Sans MS', 9, 'bold'), "font_ops": ('Comic Sans MS', 11, 'bold')}

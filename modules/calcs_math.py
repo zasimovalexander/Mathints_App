@@ -23,6 +23,9 @@ def gen_rand(
 def primality(n: int) -> bool:
     """
     Check a number for a primality.
+
+    Notes:
+        An input number is usually prefiltered to odd values, but the function remains fully self-contained.
     """
     if n < 2:
         return False
@@ -52,13 +55,13 @@ def div_detailed(number: int) -> tuple[list[tuple[int, int]], dict[int, int]]:
         pairs.append((number, 2))
         number //= 2
         ranks[2] = ranks.get(2, 0) + 1
-    prm = 3
-    while prm * prm <= number:
-        while number % prm == 0:
-            pairs.append((number, prm))
-            number //= prm
-            ranks[prm] = ranks.get(prm, 0) + 1
-        prm += 2
+    dvr = 3
+    while dvr * dvr <= number:
+        while number % dvr == 0:
+            pairs.append((number, dvr))
+            number //= dvr
+            ranks[dvr] = ranks.get(dvr, 0) + 1
+        dvr += 2
     if number > 1:
         pairs.append((number, number))
         ranks[number] = 1

@@ -12,7 +12,7 @@ Notes:
 import tkinter as tk
 from itertools import zip_longest as itertools__zip_longest
 
-from values import MAP_RANKS
+from values import OPS_MAP, RANK_MAP
 from modules.commons import factory_funcs, ensure_dir, save_txt
 from modules.common_ui import make_ui
 from modules.calcs_math import div_detailed, gcd_or_lcm
@@ -75,16 +75,14 @@ def _structuring(
             max_r = max(max_r, len(str(r)))
         corr_l.append(max_l)
         corr_r.append(max_r)
-    sep = " | "
-    len_sep = len(sep)
     section = []
     for row in itertools__zip_longest(*columnar, fillvalue=(0, 0)):
         lines = []
         for idx, (l, r) in enumerate(row):
             if l:  # significant values are always > 0
-                lines.append(f"{l:>{corr_l[idx]}}{sep}{r:<{corr_r[idx]}}")
+                lines.append(f"{l:>{corr_l[idx]}} {OPS_MAP["sep_dvr"]} {r:<{corr_r[idx]}}")
             else:
-                lines.append(" " * (corr_l[idx] + len_sep + corr_r[idx]))
+                lines.append(" " * (corr_l[idx] + 3 + corr_r[idx]))
         section.append("   ".join(lines).rstrip())
     data = ["\n".join(section) + "\n\n", ]
 
@@ -96,7 +94,7 @@ def _structuring(
 
     if linear2:
         section = []
-        sep = " = "
+        sep = f" {OPS_MAP["equal"]} "
         for row in linear2:
             section.append(f"{row[0]}{sep + _expression(row[1]) if row[1] else ""}{sep}{row[2]:_}")
         data.append("\n".join(section))
@@ -110,8 +108,8 @@ def _expression(terms: dict[int, int]) -> str:
     """
     line = []
     for k in sorted(terms.keys()):
-        line.append(f"{k:_}{"".join(MAP_RANKS[d] for d in str(terms[k]))}")
-    return " · ".join(line)
+        line.append(f"{k:_}{"".join(RANK_MAP[d] for d in str(terms[k]))}")
+    return f" {OPS_MAP["mul_wee"]} ".join(line)
 
 
 def _output(
