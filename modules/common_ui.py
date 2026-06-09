@@ -60,6 +60,7 @@ def make_ui(
     i_lang = cust[vls.SET_CUST["LANG"]["name"]]
     cfg.update({"munit": settings["Name"][i_lang][2:],                                       # : str
                 "pref_ranks": vls.TEXTS_MU["Label"][i_lang],                                 # : str
+                "delta_rank": 10 - cfg["max_rank"],                                          # : int
                 "patt_final_sep": fr"{cfg["patt_nums"]}{cfg["sep_nums"]}+(?:0|\D)*$"})       # : str
 
     # Make widgets
@@ -492,7 +493,7 @@ def _add_entry(
         line: str
 ) -> None:
     """
-    Insert a string into the Entry widget at the cursor and normalize it.
+    Insert a string into the Entry widget at the cursor and normalize it (like the keyboard pipeline).
     """
     cfg["entry"].insert("insert", line)
     _control_input(cfg)
@@ -524,15 +525,18 @@ def _rand_numbers(
         • If rank > 0: Single random number of that digit length, if the max amount of numbers has not been reached.
         • If rank == 0: Sequence of random numbers with random digit lengths (input control is not required).
     """
-    if rank:
+    _relay_lock(cfg, True)
+    if rank > 0:
         if len(cfg["numbers"]) < cfg["max_nums"]:
-            _add_entry(cfg, f"{cfg["sep_nums"]}{_make_rand(cfg, rank)}")
-    else:
-        _relay_lock(cfg, True)
+            number_rand = _make_rand(cfg, rank)
+            _relay_lock(cfg)
+            _add_entry(cfg, f"{cfg["sep_nums"]}{number_rand}")
+        else:
+            _relay_lock(cfg)
+    elif rank == 0:
         numbers_rand = []
         for _ in range(cfg["max_nums"]):
-            rank = gen_rand(1, 10 - cfg["max_rank"])
-            numbers_rand.append(str(_make_rand(cfg, rank)))
+            numbers_rand.append(str(_make_rand(cfg, gen_rand(1, cfg["delta_rank"]))))
         _update_and_unlock(
             cfg,
             numbers_rand
