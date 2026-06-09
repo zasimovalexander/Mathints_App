@@ -90,9 +90,9 @@ def ui_pick() -> None:
     for idx, itm in enumerate(vls.TEXTS_PICK["Menu"]["languages"]):
         menu_lang.add_command(
             label=itm,
-            command=lambda i=idx: _chose_lang(cfg, i)
+            command=lambda i=idx: _chose_lang(cfg, i),
+            state = "normal" if idx != i_lang else "disabled"
         )
-    menu_lang.entryconfig(i_lang, state="disabled")
     cfg.update({"menu": menu, "menu_lang": menu_lang})                                   # : tk.Menu
 
     munit_name = vls.SET_CUST["MUNIT"]["name"]
@@ -188,6 +188,7 @@ def _open_munit(cfg: dict) -> None:
         • Dynamically import a module by a path.
         • Call its UI entry point with parent window, settings, and specification.
     """
+    cfg["win_pick"].withdraw()
     i_lang = cfg["win_pick"].ui_pick__cust[vls.SET_CUST["LANG"]["name"]]
     if cfg["menu"]:
         cfg["menu"].entryconfig(
@@ -196,7 +197,6 @@ def _open_munit(cfg: dict) -> None:
         )
         cfg["menu"] = None                                                               # : None
         cfg["win_pick"].unbind(vls.TEXTS_PICK["Event_kb"]["lang"])
-    cfg["win_pick"].withdraw()
     i_munit = cfg["win_pick"].ui_pick__cust[vls.SET_CUST["MUNIT"]["name"]]
     set_mu = vls.SET_MUS[i_munit]
     spec_mu = load_pkl(set_mu["Path_help"].format(lng=i_lang))

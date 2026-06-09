@@ -44,58 +44,59 @@ def make_ui(
                    | tk.Tk | tk.Toplevel | tk.Label | tk.Entry | tk.Text | tk.Canvas | tk.Button
                    | list[str]
                    | dict[str | bool, str | tk.Toplevel]] = {
-        "max_rank": settings["Max_rank"],                                                # : int
-        "max_nums": settings["Max_numbers"],                                             # : int
-        "min_nums": settings["Min_numbers"] - 1,                                         # : int
-        "numbers": [],                                                                   # : list[str]
-        "sep_nums": vls.TEXTS_MU["Menu"]["0_9"]["next_items"][-1],                       # : str
-        "patt_nums": r"[1-9][0-9]*",                                                     # : str
-        "last_text": "",                                                                 # : str
-        "win_parent": win_parent,                                                        # : tk.Tk
-        "wins_help": {},                                                                 # : dict[str, tk.Toplevel]
-        "states_wgt": {True: "disable", False: "normal"},                                # : dict[bool, str]
-        "rand_name": vls.SET_CUST["RAND"]["name"].format(imu=i_munit),                   # : str
+        "max_rank": settings["Max_rank"],                                                    # : int
+        "max_nums": settings["Max_numbers"],                                                 # : int
+        "min_nums": settings["Min_numbers"] - 1,                                             # : int
+        "numbers": [],                                                                       # : list[str]
+        "sep_nums": vls.TEXTS_MU["Menu"]["0_9"]["next_items"][-1],                           # : str
+        "patt_nums": r"[1-9][0-9]*",                                                         # : str
+        "last_text": "",                                                                     # : str
+        "win_parent": win_parent,                                                            # : tk.Tk
+        "wins_help": {},                                                                     # : dict[str, tk.Toplevel]
+        "states_wgt": {True: "disable", False: "normal"},                                    # : dict[bool, str]
+        "rand_name": vls.SET_CUST["RAND"]["name"].format(imu=i_munit),                       # : str
     }
     cust = win_parent.ui_pick__cust
     i_lang = cust[vls.SET_CUST["LANG"]["name"]]
-    cfg.update({"munit": settings["Name"][i_lang][2:],                                   # : str
-                "pref_ranks": vls.TEXTS_MU["Label"][i_lang],                             # : str
-                "patt_final_sep": fr"{cfg["patt_nums"]}{cfg["sep_nums"]}+(?:0|\D)*$"})   # : str
+    cfg.update({"munit": settings["Name"][i_lang][2:],                                       # : str
+                "pref_ranks": vls.TEXTS_MU["Label"][i_lang],                                 # : str
+                "patt_final_sep": fr"{cfg["patt_nums"]}{cfg["sep_nums"]}+(?:0|\D)*$"})       # : str
 
     # Make widgets
     win = tk.Toplevel(win_parent)
     win._make_ui__last_state = ""
-    win._make_ui__calculations = lambda: None
+    win._make_ui__calculations = lambda nums, _: nums
     win.title(cfg["munit"])
-    cfg["win"] = win                                                                     # : tk.Toplevel
+    cfg["win"] = win                                                                         # : tk.Toplevel
 
-    cfg["label_ranks"] = tk.Label(win, text=cfg["pref_ranks"])                           # : tk.Label
+    cfg["label_ranks"] = tk.Label(win, text=cfg["pref_ranks"])                               # : tk.Label
 
-    cfg["entry"] = tk.Entry(win, width=53, bd=3)                                         # : tk.Entry
+    cfg["entry"] = tk.Entry(win, width=53, bd=3)                                             # : tk.Entry
+
+    cfg["butt_clean"] = make_button(cfg,
+                                    vls.TEXTS_MU["Button"]["clean"][i_lang],
+                                    lambda: (_clean_entry(cfg), _control_input(cfg)),
+                                    "disabled")                                              # : tk.Button
 
     frame_display = tk.Frame(win)
     scroll_x = tk.Scrollbar(frame_display, orient="horizontal")
-    scroll_x.pack(side="bottom", fill="x")
     scroll_y = tk.Scrollbar(frame_display)
+    cfg["display"] = (_make_text, _make_canvas)[i_munit](frame_display, scroll_x, scroll_y)  # : tk.Text | tk.Canvas
+    scroll_x.config(command=cfg["display"].xview)
+    scroll_y.config(command=cfg["display"].yview)
+    scroll_x.pack(side="bottom", fill="x")
     scroll_y.pack(side="right", fill="y")
-    display = (_make_text, _make_canvas)[i_munit](frame_display, scroll_x, scroll_y)
-    display.pack(side="left", fill="both", expand=True)
-    scroll_x.config(command=display.xview)
-    scroll_y.config(command=display.yview)
-    cfg["display"] = display                                                             # : tk.Text | tk.Canvas
+    cfg["display"].pack(side="left", fill="both", expand=True)
 
     buttons = [make_button(cfg,
                            vls.TEXTS_MU["Button"][k][i_lang],
                            lambda f=fnc: f(cfg)
-                           ) for k, fnc in zip(("back", "equal", "exit"),
-                                               (_revert, _to_calcs, confirm_end))]
-    cfg["butt_equal"] = buttons[1]                                                       # : tk.Button
-    cfg["butt_equal"].config(state="disabled")
-
-    cfg["butt_clean"] = make_button(cfg,
-                                    vls.TEXTS_MU["Button"]["clean"][i_lang],
-                                    lambda: (_clean_entry(cfg), _control_input(cfg)))    # : tk.Button
-    cfg["butt_clean"].config(state="disabled")
+                           ) for k, fnc in zip(("back", "exit"),
+                                               (_revert, confirm_end))]
+    cfg["butt_equal"] = make_button(cfg,
+                                    vls.TEXTS_MU["Button"]["equal"][i_lang],
+                                    lambda: _to_calcs(cfg),
+                                    "disabled")                                              # : tk.Button
 
     # Place widgets
     if cust.get(cfg["rand_name"]) not in vls.SET_CUST["RAND"]["valid"]:
@@ -107,7 +108,8 @@ def make_ui(
     frame_display.grid(row=2, columnspan=2, sticky="nsew", padx=5)  # occupy all grid columns for independent widening
     win.columnconfigure(1, weight=1)
     win.rowconfigure(2, weight=1)
-    for btn, sd in zip(buttons, ("w", "", "e")):
+    for btn, sd in zip((*buttons, cfg["butt_equal"]),
+                       ("w", "e", "")):
         btn.grid(row=3, sticky=sd, padx=10, pady=10)
 
     # Make binds
@@ -155,8 +157,8 @@ def _make_text(
                    bg="#e6f2ff",
                    relief="flat",
                    padx = 10, pady = 10,
-                   xscrollcommand=srl_x.set, yscrollcommand=srl_y.set)
-    text.config(state="disabled")
+                   xscrollcommand=srl_x.set, yscrollcommand=srl_y.set,
+                   state="disabled")
     return text
 
 
@@ -264,13 +266,18 @@ def _clean_entry(cfg: dict) -> None:
 
 def confirm_end(cfg: dict) -> None:
     """
-    Confirm to exit the application.
+    Confirm to exit the application. The modal Tk window is composed of three independent layers (OS/Tk/Python
+    flow control), which are not strictly synchronized across platforms. Design rationale:
+        • transient(): binds dialog to parent window (OS-level hint).
+        • grab_set(): redirects all Tk events to this window (Tk-level modal lock).
+        • focus_set(): best-effort request to move keyboard input to dialog (not guaranteed by OS).
+        • wait_window(): blocks Python execution until Tk receives a window destroy event.
     """
     win_confirm = tk.Toplevel(cfg["win"])
-    i_lang = cfg["win_parent"].ui_pick__cust[vls.SET_CUST["LANG"]["name"]]
-    win_confirm.title(vls.TEXTS_CONFIRM["Title"][i_lang])
     win_confirm.transient(cfg["win"])
     win_confirm.grab_set()
+    i_lang = cfg["win_parent"].ui_pick__cust[vls.SET_CUST["LANG"]["name"]]
+    win_confirm.title(vls.TEXTS_CONFIRM["Title"][i_lang])
 
     button = make_button({"win": win_confirm},
                          vls.TEXTS_CONFIRM["Button"][i_lang],
@@ -307,7 +314,8 @@ def _end(cfg: dict) -> None:
 def make_button(
         cfg: dict,
         info: str,
-        func: Callable
+        func: Callable,
+        st: str ="normal"
 ) -> tk.Button:
     """
     Build and return a Button widget.
@@ -320,7 +328,8 @@ def make_button(
                      bg="grey",
                      activebackground="white",
                      cursor="hand2",
-                     command=func)
+                     command=func,
+                     state=st)
 
 
 def _make_menu(
@@ -423,17 +432,17 @@ def _show_help(
     cfg["wins_help"][key_win] = win_help
 
     scroll = tk.Scrollbar(win_help)
-    scroll.pack(side="right", fill="y")
     text = tk.Text(win_help,
                    wrap="word",
                    font=("Consolas", 11),
                    bg="#f0f0f0",
                    relief="flat",
                    yscrollcommand=scroll.set)
+    scroll.config(command=text.yview)
+    scroll.pack(side="right", fill="y")
     text.insert("1.0", content)
     text.config(state="disabled")
     text.pack(side="left", fill="both", expand=True, padx=5, pady=5)
-    scroll.config(command=text.yview)
 
     win_help.protocol(
         "WM_DELETE_WINDOW",
